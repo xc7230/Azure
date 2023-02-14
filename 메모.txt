@@ -62,3 +62,192 @@ kubeadm join 10.0.0.4:6443 --token 3yyzk6.krogjrsrnwas5fkp \
         --discovery-token-ca-cert-hash sha256:6e99b56c62a960d34c0c0e0f05c0dbce800081866efb3a556c57899723d9a8d2
 
 wget https://docs.projectcalico.org/manifests/calico.yaml
+
+    1  apt-get update
+    2  apt-get install     ca-certificates     curl     gnupg     lsb-release
+    3  mkdir -m 0755 -p /etc/apt/keyrings
+    4  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    5  echo   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    6  apt-get update
+    7  sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    8  systemctl status docker
+    9  swapoff -a && sed -i '/swap/s/&/#/' /etc/fstab
+   10  ufw disable
+   11  cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+
+   12  sysctl --system
+   13  apt-get update && sudo apt-get install -y apt-transport-https ca-certificates curl
+   14  sudo curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
+   15  echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+   16  apt-get update
+   17  sudo apt-get install -y kubelet=1.24.9-00                      kubeadm=1.24.9-00                      kubelet=1.24.9-00
+   18  history
+   19  apt-mark hold kubelet kubeadm kubectl
+   20  systemctl daemon-reload
+   21  systemctl restart kubelet
+   22  sudo mkdir /etc/docker
+   23  cat <<EOF | sudo tee /etc/docker/daemon.json
+{
+"exec-opts": ["native.cgroupdriver=systemd"],
+"log-driver": "json-file",
+"log-opts": {
+"max-size": "100m"
+},
+"storage-driver": "overlay2"
+}
+EOF
+
+   24  systemctl enable docker
+   25  systemctl daemon-reload
+   26  systemctl restart docker
+   27  systemctl status kubelet
+   28  kubeadm init
+   29  vi /etc/containerd/config.toml
+   30  systemctl restart containerd
+   31  kubeadm init
+   32  kubeadm reset
+   33  kubeadm init --pod-network-cidr=10.244.0.0/16
+   34  kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/v0.20.2/Documentation/kube-flannel.yml
+   35  mkdir -p $HOME/.kube
+   36  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+   37  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+   38  kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/v0.20.2/Documentation/kube-flannel.yml
+   39  kubectl get nodes
+   40  kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+   41  mkdir /k8s
+   42  cd /k8s
+   43  wget https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+   44  mv recommended.yaml kubernetes-dashboard.yaml
+   45  vi kubernetes-dashboard.yaml
+   46  kubectl apply -f kubernetes-dashboard.yaml
+   47  kubectl get svc -n kubernetes-dashboard
+   48  vi adminuser.yaml
+   49  vi kubernetes-dashboard.yaml
+   50  kubectl apply -f adminuser.yaml
+   51  kubectl apply -f kubernetes-dashboard.yaml
+   52  kubectl create sa admin-user -n kubernetes-dashboard
+   53  kubectl get svc -n kubernetes-dashboard
+   54  kubectl apply -f adminuser.yaml
+   55  kubectl create sa admin-user -n kubernetes-dashboard
+   56  cat <<EOF | kubectl create -f -
+ apiVersion: v1
+ kind: ServiceAccount
+ metadata:
+   name: admin-user
+   namespace: kube-system
+EOF
+
+   57  cat <<EOF | kubectl create -f -
+ apiVersion: rbac.authorization.k8s.io/v1
+ kind: ClusterRoleBinding
+ metadata:
+   name: admin-user
+ roleRef:
+   apiGroup: rbac.authorization.k8s.io
+   kind: ClusterRole
+   name: cluster-admin
+ subjects:
+ - kind: ServiceAccount
+   name: admin-user
+   namespace: kube-system
+EOF
+
+   58  cat <<EOF | kubectl delete -f -
+ apiVersion: rbac.authorization.k8s.io/v1
+ kind: ClusterRoleBinding
+ metadata:
+   name: admin-user
+ roleRef:
+   apiGroup: rbac.authorization.k8s.io
+   kind: ClusterRole
+   name: cluster-admin
+ subjects:
+ - kind: ServiceAccount
+   name: admin-user
+   namespace: kube-system
+EOF
+
+   59  cat <<EOF | kubectl create -f -
+ apiVersion: rbac.authorization.k8s.io/v1
+ kind: ClusterRoleBinding
+ metadata:
+   name: admin-user
+ roleRef:
+   apiGroup: rbac.authorization.k8s.io
+   kind: ClusterRole
+   name: cluster-admin
+ subjects:
+ - kind: ServiceAccount
+   name: admin-user
+   namespace: kube-system
+EOF
+
+   60  kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')
+   61  kubectl create sa admin-user -n kubernetes-dashboard
+   62  kubectl apply -f adminuser.yaml
+   63  kubectl create sa admin-user -n kubernetes-dashboard
+   64  cat <<EOF | kubectl delete -f -
+ apiVersion: rbac.authorization.k8s.io/v1
+ kind: ClusterRoleBinding
+ metadata:
+   name: admin-user
+ roleRef:
+   apiGroup: rbac.authorization.k8s.io
+   kind: ClusterRole
+   name: cluster-admin
+ subjects:
+ - kind: ServiceAccount
+   name: admin-user
+   namespace: kube-system
+EOF
+
+   65  kubectl apply -f adminuser.yaml
+   66  kubectl create sa admin-user -n kubernetes-dashboard
+   67  kubectl apply -f kubernetes-dashboard.yaml
+   68  kubectl create sa admin-user -n kubernetes-dashboard
+   69  kubectl delete -f kubernetes-dashboard.yaml
+   70  kubectl apply -f kubernetes-dashboard.yaml
+   71  kubectl create sa admin-user -n kubernetes-dashboard
+   72  kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')
+   73  kubectl create sa admin-user -n kubernetes-dashboard
+   74  vi adminuser.yaml
+   75  vi kubernetes-dashboard.yaml
+   76  kubectl -n kubernetes-dashboard create token admin-user
+   77  ufw allow 30001
+   78  kubectl get svc -n kubernetes-dashboard
+   79  sudo ufw disable
+   80  kubectl get svc -n kubernetes-dashboard
+   81  curl http://4.217.168.255:30001
+   82  curl http://4.217.168.255:30001/
+   83  kubectl get nodes
+   84  netstat -anlp | grep :30001
+   85  apt install net-tools
+   86  netstat -anlp | grep :30001
+   87  netstat -anlp | grep : 9090
+   88  netstat -anlp | grep :9090
+   89  netstat -anlp | grep :80
+   90  netstat -anlp | grep :90
+   91  kubectl get pods --all-namespace
+   92  kubectl get pods --all
+   93  kubectl get --help
+   94  kubectl get -a
+   95  kubectl get -A
+   96  kubectl create clusterrolebinding --user system:serviceaccount:default:default default-sa-admin --clusterrole cluster-admin
+   97  wget https://raw.githubusercontent.com/kubernetes/dashboard/v2.5.0/aio/deploy/recommended.yaml
+   98  ls
+   99  vi recommended.yaml
+  100  kubectl apply -f recommended.yaml
+  101  kubectl get pods -A
+  102  kubectl get services -n kubernetes-dashboard
+  103  kubectl delete -f recommended.yaml
+  104  kubectl get services -n kubernetes-dashboard
+  105  kubectl apply -f recommended.yaml
+  106  kubectl get pods -A
+  107  kubectl get services -n kubernetes-dashboard
+  108  kubectl -n kubernetes-dashboard create token admin-user
+  109  kubectl create sa admin-user -n kubernetes-dashboard
+  110  kubectl -n kubernetes-dashboard create token admin-user
